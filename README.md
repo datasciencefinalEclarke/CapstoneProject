@@ -6,11 +6,11 @@ Capstone Project - INFS 692
 Emma Clarke
 December 16, 2022 
 
-1. Title and brief description
+1. Title and brief description:
 Capstone Project - Data Science (INFS 692) - Master of Information Studies, McGill University.
 This is the capstone project of INFS 692 at McGill University. 
 
-2. Project Description
+2. Project Description:
 The objective of this project was to develop different models to predict the endpoint of the radiomics signature based from MRI, PET and CT scans.
 I created an ensemble classification model, using:
 
