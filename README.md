@@ -12,12 +12,12 @@ This is the capstone project of INFS 692 at McGill University.
 
 2. Project Description
 The objective of this project was to develop different models to predict the endpoint of the radiomics signature based from MRI, PET and CT scans.
-I created an ensemble classification model, using KNN, logistical regression, and decision tree methods.
-I then created a neural network-based classification model. Then, without considering the binary output and categorical variables in the dataset, I
+I created an ensemble classification model, using KNN (capstone_model_1_3, logistical regression (capstone_model_1_2), and decision tree (capstone_model_1_1) methods.
+I then created a neural network-based classification model (capstone_model_2. Then, without considering the binary output and categorical variables in the dataset, I
 compared the following clustering technique results:
-  o K-Means
-  o Hierarchical
-  o Model Based
+  o K-Means (capstone_model_3_1)
+  o Hierarchical (capstone_model_3_2)
+  o Model Based (capstone_model_3_3)
 
 I completed these tasks using RStudio 4.2.2.
  
