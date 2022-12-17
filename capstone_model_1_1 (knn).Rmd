@@ -1,0 +1,293 @@
+---
+title: "capstone_model_1_1 (knn)"
+output: pdf_document
+date: "2022-12-17"
+---
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Helper packages
+```{r}
+library(dplyr)      # for data wrangling
+library(ggplot2)    # for awesome graphics
+library(rsample)    # for creating validation splits
+library(recipes)    # for feature engineering
+library(dslabs)     # for mnist data
+library(purrr)      #for mapping
+library(tidyverse)  # for filtering 
+library(modeldata)
+library(ggpubr)
+library(caret)       # for fitting KNN models
+library(MASS)
+library(caTools)
+library(pROC)
+library(vip)
+library(ROCR)
+```
+#importat dataset
+```{r}
+
+radiomics <- read.csv("radiomics_completedata.csv")
+
+str(radiomics)
+glimpse(radiomics)
+```
+# initial dimension
+```{r}
+dim(radiomics)
+```
+
+#check for missing values
+```{r}
+is.na(radiomics)
+sum(is.na(radiomics))
+na.omit(radiomics)
+```
+#normality test
+```{r}
+attach(radiomics)
+summary(Entropy_cooc.W.ADC)
+summary(GLNU_align.H.PET)
+summary(Energy_hist.PET)
+hist(Entropy_cooc.W.ADC)
+hist(GLNU_align.H.PET)
+hist(Energy_hist.PET)
+```
+#convert to matrix and test normality with QQ-plot
+```{r}
+dummy <- dummyVars(Failure.binary ~ ., data=radiomics)
+newdata <- data.frame(predict(dummy, newdata = radiomics)) 
+newdata
+newdata2 <- as.matrix(newdata)
+qqnorm(newdata2)
+```
+#normality graphs 
+```{r}
+boxplot(Entropy_cooc.W.ADC, main = "Entropy_cooc.W.ADC")
+hist(Entropy_cooc.W.ADC)
+```
+#correlation
+```{r}
+newdf1 = subset(radiomics, select = c(-Institution))
+newdf1
+cor.newdf1 = cor(newdf1)
+corr = round(cor.newdf1,2)  
+```
+
+# create training (80%) set 
+```{r}
+radiom <- radiomics %>% mutate_if(is.ordered, factor, ordered = FALSE)
+set.seed(123)
+churn_split <- initial_split(radiom, prop = 0.8, strata = "Failure.binary")
+churn_train <- training(churn_split)
+```
+# import MNIST training data
+```{r, eval = FALSE}
+mnist <- dslabs::read_mnist()
+names(mnist)
+
+pred_class_1 <- predict(cv_model1, churn_train)
+```
+
+#print AUC values in training phase
+```{r, eval = FALSE}
+knngrid_prob <- predict(knn_grid, churn_train, type = "prob")$Yes
+roc(churn_train$Failure.binary ~ knngrid_prob, plot=TRUE, legacy.axes=FALSE, 
+    percent=TRUE, col="black", lwd=2, print.auc=TRUE)
+title(main = "Model Performance during Training", line = 2.5)
+```
+
+# Create blueprint
+```{r, eval = FALSE}
+blueprint <- recipe(Failure.binary ~ ., data = churn_train) %>%
+  step_nzv(all_nominal()) %>%
+  step_dummy(all_nominal(), -all_outcomes(), one_hot = TRUE) %>%
+  step_center(all_numeric(), -all_outcomes()) %>%
+  step_scale(all_numeric(), -all_outcomes())
+```
+# Create a resampling method
+```{r, eval = FALSE}
+cv <- trainControl(
+  method = "repeatedcv", 
+  number = 10, 
+  repeats = 5,
+  classProbs = TRUE,                 
+  summaryFunction = twoClassSummary
+)
+```
+# Create a hyperparameter grid search
+```{r, eval = FALSE}
+hyper_grid <- expand.grid(
+  k = floor(seq(1, nrow(churn_train)/3, length.out = 20))
+)
+```
+# Fit knn model and perform grid search
+```{r, eval = FALSE}
+knn_grid <- train(
+  blueprint, 
+  data = churn_train, 
+  method = "knn", 
+  trControl = cv, 
+  tuneGrid = hyper_grid,
+  metric = "ROC"
+)
+
+ggplot(knn_grid)
+
+
+set.seed(123)
+index <- sample(nrow(mnist$train$images), size = 10000)
+mnist_x <- mnist$train$images[index, ]
+mnist_y <- factor(mnist$train$labels[index])
+
+mnist_x %>%
+  as.data.frame() %>%
+  map_df(sd) %>%
+  gather(feature, sd) %>%
+  ggplot(aes(sd)) +
+  geom_histogram(binwidth = 1)
+```
+
+# Rename features
+```{r, eval = FALSE}
+colnames(mnist_x) <- paste0("V", 1:ncol(mnist_x))
+```
+# Remove near zero variance features manually
+```{r, eval = FALSE}
+nzv <- nearZeroVar(mnist_x)
+index <- setdiff(1:ncol(mnist_x), nzv)
+mnist_x <- mnist_x[, index]
+```
+# Use train/validate resampling method
+```{r, eval = FALSE}
+cv <- trainControl(
+  method = "LGOCV", 
+  p = 0.7,
+  number = 1,
+  savePredictions = TRUE
+)
+```
+# Create a hyperparameter grid search
+```{r, eval = FALSE}
+hyper_grid <- expand.grid(k = seq(3, 25, by = 2))
+```
+# Execute grid search
+```{r, eval = FALSE}
+knn_mnist <- train(
+  mnist_x,
+  mnist_y,
+  method = "knn",
+  tuneGrid = hyper_grid,
+  preProc = c("center", "scale"),
+  trControl = cv
+)
+
+ggplot(knn_mnist)
+```
+#top 20 important features during training
+```{r, eval = FALSE}
+vi <- varImp(knn_mnist)
+vi
+```
+#model performance during training
+```{r, eval = FALSE}
+roc(churn_train$Failure.binary ~ m1_prob, plot=TRUE, legacy.axes=FALSE, 
+    percent=TRUE, col="black", lwd=2, print.auc=TRUE)
+plot.roc(churn_train$Failure.binary ~ m2_prob,  percent=TRUE, col="red", 
+         lwd=2, print.auc=TRUE, add=TRUE, print.auc.y=40)
+plot.roc(churn_train$Failure.binary ~ m3_prob,  percent=TRUE, col="blue", 
+         lwd=2, print.auc=TRUE, add=TRUE, print.auc.y=30)
+title(main = "Model Performance during Training", line = 2.5)
+
+roc(churn_test$Failure.binary ~ m1_prob, plot=TRUE, legacy.axes=FALSE, 
+    percent=TRUE, col="black", lwd=2, print.auc=TRUE)
+plot.roc(churn_test$Failure.binary ~ m2_prob,  percent=TRUE, col="red", 
+         lwd=2, print.auc=TRUE, add=TRUE, print.auc.y=40)
+plot.roc(churn_test$Failure.binary ~ m3_prob,  percent=TRUE, col="blue", 
+         lwd=2, print.auc=TRUE, add=TRUE, print.auc.y=30)
+title(main = "Model Performance during Testing", line = 2.5)
+
+
+m1_prob <- predict(cv_model1, churn_test, type = "prob")$Yes
+
+perf1 <- prediction(m1_prob, churn_test$Failure.binary) %>%
+  performance(measure = "tpr", x.measure = "fpr")
+```
+#  confusion matrix
+```{r, eval = FALSE}
+cm <- confusionMatrix(knn_mnist$pred$pred, knn_mnist$pred$obs)
+cm$byClass[, c(1:2, 11)]  # sensitivity, specificity, & accuracy
+```
+#print AUC values during testing phase
+```{r, eval = FALSE}
+knngrid_probtest <- predict(knn_grid, churn_test, type = "prob")$Yes
+roc(churn_test$Failure.binary ~ knngrid_probtest, plot=TRUE, legacy.axes=FALSE, 
+    percent=TRUE, col="black", lwd=2, print.auc=TRUE)
+title(main = "Model Performance during Testing", line = 2.5)
+```
+
+#  median value of feature importance
+```{r, eval = FALSE}
+imp <- vi$importance %>%
+  rownames_to_column(var = "feature") %>%
+  gather(response, imp, -feature) %>%
+  group_by(feature) %>%
+  summarize(imp = median(imp))
+```
+#  tibble for all edge pixels
+```{r, eval = FALSE}
+edges <- tibble(
+  feature = paste0("V", nzv),
+  imp = 0
+)
+```
+# Combine and plot
+```{r, eval = FALSE}
+imp <- rbind(imp, edges) %>%
+  mutate(ID  = as.numeric(str_extract(feature, "\\d+"))) %>%
+  arrange(ID)
+image(matrix(imp$imp, 28, 28), col = gray(seq(0, 1, 0.05)), 
+      xaxt="n", yaxt="n")
+```
+# Few accurate predictions
+```{r, eval = FALSE}
+set.seed(9)
+good <- knn_mnist$pred %>%
+  filter(pred == obs) %>%
+  sample_n(4)
+```
+# Few inaccurate predictions
+```{r, eval = FALSE}
+set.seed(9)
+bad <- knn_mnist$pred %>%
+  filter(pred != obs) %>%
+  sample_n(4)
+
+combine <- bind_rows(good, bad)
+```
+# Original feature set with all pixel features
+```{r, eval = FALSE}
+set.seed(123)
+index <- sample(nrow(mnist$train$images), 10000)
+X <- mnist$train$images[index,]
+```
+# Plot results
+```{r, eval = FALSE}
+par(mfrow = c(4, 2), mar=c(1, 1, 1, 1))
+layout(matrix(seq_len(nrow(combine)), 4, 2, byrow = FALSE))
+for(i in seq_len(nrow(combine))) {
+  image(matrix(X[combine$rowIndex[i],], 28, 28)[, 28:1], 
+        col = gray(seq(0, 1, 0.05)),
+        main = paste("Actual:", combine$obs[i], "  ", 
+                     "Predicted:", combine$pred[i]),
+        xaxt="n", yaxt="n") 
+}
+
+
+```
+
+  
