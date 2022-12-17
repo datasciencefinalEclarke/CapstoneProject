@@ -1,0 +1,141 @@
+---
+title: "capstone_model_3_3 (modelbased)"
+output:
+  pdf_document: default
+  html_document: default
+date: "2022-12-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Helper packages
+```{r}
+library(dplyr)    # for data manipulation
+library(ggplot2)  # for data visualization
+```
+# Modeling packages
+```{r}
+library(mclust)   # for fitting clustering algorithms
+library(MASS)
+```
+#import dataset
+```{r}
+
+radiomics <- read.csv("radiomics_completedata.csv")
+
+str(radiomics)
+glimpse(radiomics)
+```
+# initial dimension
+```{r}
+dim(radiomics)
+```
+
+#check for missing values
+```{r}
+is.na(radiomics)
+sum(is.na(radiomics))
+na.omit(radiomics)
+```
+
+
+```{r}
+head(radiomics)
+newdf1 = subset(radiomics, select = c(-Institution))
+newdf1
+```
+
+# Apply GMM model with 3 components
+```{r}
+radiom_mc <- Mclust(newdf1, G = 3)
+```
+# Plot results
+```{r, eval = FALSE}
+plot(radiom_mc, what = "density")
+plot(radiom_mc, what = "uncertainty")
+```
+# Observations with high uncertainty
+```{r, eval = FALSE}
+sort(radiom_mc$uncertainty, decreasing = TRUE) %>% head()
+
+
+summary(radiom_mc)
+
+radiom_optimal_mc <- Mclust(newdf1)
+
+summary(radiom_optimal_mc)
+
+legend_args <- list(x = "bottomright", ncol = 5)
+plot(radiom_optimal_mc, what = 'BIC', legendArgs = legend_args)
+plot(radiom_optimal_mc, what = 'classification')
+plot(radiom_optimal_mc, what = 'uncertainty')
+
+my_basket_mc <- Mclust(newdf1, 1:20)
+
+summary(my_basket_mc)
+
+plot(my_basket_mc, what = 'BIC', 
+     legendArgs = list(x = "bottomright", ncol = 5))
+```
+
+```{r, eval = FALSE}
+
+probabilities <- my_basket_mc$z 
+colnames(probabilities) <- paste0('C', 1:6)
+
+probabilities <- probabilities %>%
+  as.data.frame() %>%
+  mutate(id = row_number()) %>%
+  tidyr::gather(cluster, probability, -id)
+
+ggplot(probabilities, aes(probability)) +
+  geom_histogram() +
+  facet_wrap(~ cluster, nrow = 2)
+```
+
+```{r, eval = FALSE}
+
+uncertainty <- data.frame(
+  id = 1:nrow(my_basket),
+  cluster = my_basket_mc$classification,
+  uncertainty = my_basket_mc$uncertainty
+)
+
+uncertainty %>%
+  group_by(cluster) %>%
+  filter(uncertainty > 0.25) %>%
+  ggplot(aes(uncertainty, reorder(id, uncertainty))) +
+  geom_point() +
+  facet_wrap(~ cluster, scales = 'free_y', nrow = 1)
+```
+
+```{r, eval = FALSE}
+cluster2 <- my_basket %>%
+  scale() %>%
+  as.data.frame() %>%
+  mutate(cluster = my_basket_mc$classification) %>%
+  filter(cluster == 2) %>%
+  select(-cluster)
+
+cluster2 %>%
+  tidyr::gather(product, std_count) %>%
+  group_by(product) %>%
+  summarize(avg = mean(std_count)) %>%
+  ggplot(aes(avg, reorder(product, avg))) +
+  geom_point() +
+  labs(x = "Average standardized consumption", y = NULL)
+```
+
+```{r}
+###Conclusion
+#The ‘elbow’ method of the hierarchical clustering was ambiguous, not showing a clear dip or ‘elbow’, but subtly indicated a k value of 4. The silhouette plot next to it indicated a k value of 2.
+#As the ideal number of clusters was denoted as 2 in the k-means method, the clusterings of two k groups were observed. The clusters overlapped, and a high level of similarity was observed between the data points of each k group. 
+#The hierarchal dendogram model shows that the first four clusters are closely related, and that the remaining clusters are distanced.     
+#The conclusion is that all plots showed a high level of similarity between data points. 
+```
+
+
+
+
