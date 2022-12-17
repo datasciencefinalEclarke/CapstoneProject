@@ -1,0 +1,137 @@
+---
+title: "capstone_model_1_1"
+output: pdf_document
+date: "2022-12-17"
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Helper packages
+```{r}
+library(dplyr)      # for data wrangling
+library(ggplot2)    # for awesome graphics
+library(rsample)    # for creating validation splits
+library(recipes)    # for feature engineering
+library(dslabs)     # for mnist data
+library(purrr)      #for mapping
+library(tidyverse)  # for filtering 
+library(modeldata)
+library(ggpubr)
+library(caret)       # for fitting KNN models
+library(MASS)
+library(caTools)
+library(pROC)
+library(vip)
+library(ROCR)
+library(rpart)       # direct engine for decision tree application
+library(rpart.plot)  # for plotting decision trees
+library(pdp)         # for feature effects
+library(modeldata)
+```
+
+
+#import dataset
+
+```{r}
+
+radiomics <- read.csv("radiomics_completedata.csv")
+
+str(radiomics)
+glimpse(radiomics)
+
+
+dim(radiomics)
+
+
+
+is.na(radiomics)
+sum(is.na(radiomics))
+na.omit(radiomics)
+```
+
+
+#normality test
+```{r}
+attach(radiomics)
+summary(Entropy_cooc.W.ADC)
+summary(GLNU_align.H.PET)
+summary(Energy_hist.PET)
+hist(Entropy_cooc.W.ADC)
+hist(GLNU_align.H.PET)
+hist(Energy_hist.PET)
+```
+#convert to matrix and test normality with QQ-plot
+```{r}
+dummy <- dummyVars(Failure.binary ~ ., data=radiomics)
+newdata <- data.frame(predict(dummy, newdata = radiomics)) 
+newdata
+newdata2 <- as.matrix(newdata)
+qqnorm(newdata2)
+
+
+boxplot(Entropy_cooc.W.ADC, main = "Entropy_cooc.W.ADC")
+hist(Entropy_cooc.W.ADC)
+```
+
+#correlation
+```{r}
+newdf1 = subset(radiomics, select = c(-Institution))
+newdf1
+cor.newdf1 = cor(newdf1)
+corr = round(cor.newdf1,2)  
+```
+
+#training and testing sets
+```{r}
+df <- radiomics %>% mutate_if(is.ordered, factor, ordered = FALSE)
+
+set.seed(123)   
+churn_split <- initial_split(radiomics, prop = 0.8, strata = "Failure.binary")
+churn_train <- training(churn_split)
+churn_test  <- testing(churn_split)
+
+
+fit <- rpart(Failure.binary~., data = churn_train, method = 'class')
+
+
+rpart.plot(fit, extra = 106)
+
+
+plotcp(fit)
+```
+#feature importance
+```{r}
+vip(fit, num_features = 20, bar = FALSE)
+vi <- varImp(fit)
+vi
+```
+
+# Compute predicted probabilities on training data and ROC plot for training data
+```{r}
+m1_prob <- predict(fit, churn_train, type = "prob")
+
+
+roc(churn_train$Failure.binary ~ m1_prob[,2], plot=TRUE, legacy.axes=FALSE, 
+    percent=TRUE, col="black", lwd=2, print.auc=TRUE)
+```
+
+# Compute AUC metrics (training phase) and ROC plot for testing data
+
+```{r, eval = FALSE}
+perf1 <- prediction(m1_prob, churn_test$Failure.binary) %>%
+  performance(measure = "tpr", x.measure = "fpr")
+
+m1_prob <- predict(fit, churn_test, type = "prob")
+
+roc(churn_test$Failure.binary ~ m1_prob[,2], plot=TRUE, legacy.axes=FALSE, 
+    percent=TRUE, col="black", lwd=2, print.auc=TRUE) 
+ 
+perf1 <- prediction(m1_prob, churn_test$Failure.binary) %>%
+  performance(measure = "tpr", x.measure = "fpr")
+```
+
+
+
