@@ -1,0 +1,61 @@
+---
+title: "capstone_model_3_1 (kmeans)"
+output:
+  pdf_document: default
+  html_document: default
+date: "2022-12-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, eval = FALSE}
+library(dplyr)        
+library(ggplot2)      
+library(stringr)      
+library(gridExtra)    
+library(tidyverse 
+library(cluster)      
+library(factoextra)   
+```
+
+#import dataset
+```{r, eval = FALSE}
+radiomics <- read.csv("radiomics_completedata.csv")
+
+str(radiomics)
+glimpse(radiomics)
+```
+# initial dimension
+```{r, eval = FALSE}
+dim(radiomics)
+```
+
+#check for missing values
+```{r, eval = FALSE}
+is.na(radiomics)
+sum(is.na(radiomics))
+na.omit(radiomics)
+```
+
+# Scale data
+```{r, eval = FALSE}
+scale(radiomics)
+head(radiomics)
+newdf1 = subset(radiomics, select = c(-Institution))
+newdf1
+```
+#Determining Optimal Number of Clusters
+```{r, eval = FALSE}
+set.seed(123)
+``` 
+# Compute k-means clustering with k = 2
+```{r, eval = FALSE}
+final <- kmeans(newdf1, 2, nstart = 25)
+print(final)
+```
+#final data
+```{r, eval = FALSE}
+fviz_cluster(final, data = newdf1)
+```
