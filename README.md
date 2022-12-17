@@ -26,3 +26,4 @@ to better understand how to interpret the models.
 
 3. How To View
 The .RMD files can be viewed in RStudio. The PDFs can be viewed in Adobe or Google Chrome. 
+
